@@ -1,0 +1,11 @@
+incubator-hugegraph-ai/
+incubator-hugegraph/
+hugegraph-computer/
+hugegraph-llm/
+graphiti-source/
+.workbuddy/
+.pytest_cache/
+.env
+*.pyc
+__pycache__/
+.DS_Store
