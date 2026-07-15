@@ -47,10 +47,12 @@ _VERTEX_LABELS: dict[str, list[str]] = {
 _EDGE_LABELS: dict[tuple[str, str, str], list[str]] = {
     # (label, source_label, target_label): properties
     ("RELATES_TO", "Entity", "Entity"): [
-        "uuid", "group_id", "fact", "valid_at", "invalid_at", "expired_at",
+        "uuid", "group_id", "name", "fact", "valid_at", "invalid_at", "expired_at",
         "reference_time", "episodes", "created_time", "attributes",
         "source_node_uuid", "target_node_uuid"],
     ("MENTIONS", "Episodic", "Entity"): [
+        "uuid", "group_id", "created_time"],
+    ("NEXT_EPISODE", "Episodic", "Episodic"): [
         "uuid", "group_id", "created_time"],
 }
 

@@ -39,6 +39,16 @@ class LocalEmbedder:
     def cosine(self, a: np.ndarray, b: np.ndarray) -> float:
         return float(np.dot(a, b))  # vectors are L2-normalized
 
+    def _to_arr(self, vec) -> np.ndarray:
+        """Convert a list[float] embedding to a normalized np.array (cached)."""
+        if isinstance(vec, np.ndarray):
+            return vec
+        arr = np.array(vec, dtype=np.float32)
+        norm = np.linalg.norm(arr)
+        if norm > 0:
+            arr = arr / norm
+        return arr
+
     def top_k(self, query_vec: np.ndarray,
               candidates: Iterable[tuple[str, np.ndarray]],
               k: int = 10) -> list[tuple[str, float]]:
