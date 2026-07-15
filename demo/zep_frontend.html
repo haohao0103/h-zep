@@ -104,6 +104,25 @@
       <div id="stats" class="stats">—</div>
       <button class="ghost" onclick="resetGraph()" style="margin-top:8px;width:100%;">重置图谱</button>
     </div>
+
+    <div class="card" style="border-color:var(--accent);">
+      <h2>📚 LOCOMO 基准数据集 <span class="badge">业界 agent-memory 评测</span></h2>
+      <div class="stats" style="margin-bottom:6px;">Zep 官方长对话记忆评测集 · 10 sessions · 真实人物跨月对话 + 199 QA/session</div>
+      <select id="locomo-idx" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;" onchange="loadLocomoQA()">
+        <option value="">— 选择 LOCOMO session —</option>
+      </select>
+      <div class="row" style="margin-top:6px;">
+        <select id="locomo-n" style="flex:0 0 90px;">
+          <option value="2">前2轮</option>
+          <option value="3" selected>前3轮</option>
+          <option value="5">前5轮</option>
+        </select>
+        <button class="green" id="btn-locomo" onclick="loadLocomo()">摄入LOCOMO对话</button>
+      </div>
+      <div id="locomo-result" class="stats" style="margin-top:6px;"></div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted);">QA 测评（点击自动检索）：</div>
+      <div id="locomo-qa" style="max-height:160px;overflow-y:auto;margin-top:4px;"></div>
+    </div>
   </div>
 
   <!-- 中栏：图谱 -->
@@ -157,9 +176,14 @@ function pipe(active){ for(let i=1;i<=5;i++){
   document.getElementById('p'+i).classList.toggle('active', i<=active); } }
 
 async function post(url, data){
-  const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
+  const resp = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify(data)});
-  return r.json();
+  const ct = resp.headers.get('content-type')||'';
+  if (!ct.includes('json')) {
+    const text = await resp.text();
+    return {error: `服务异常 (HTTP ${resp.status}): ${text.slice(0,300)}`};
+  }
+  return resp.json();
 }
 
 async function addEpisode(){
@@ -172,6 +196,7 @@ async function addEpisode(){
   pipe(1);
   try{
     const r=await post('/api/add_episode',{body,date,name:'ep'});
+    if (r.error){ document.getElementById('add-result').innerHTML=`<span style="color:var(--red);">✗ ${r.error}</span>`; pipe(0); return; }
     pipe(5);
     document.getElementById('add-result').innerHTML=
       `<span style="color:var(--green);">✓ 提取 ${r.entities} 实体 / ${r.edges} 关系边</span>`;
@@ -180,11 +205,13 @@ async function addEpisode(){
   finally{ btn.disabled=false; btn.textContent=old; setTimeout(()=>pipe(0),1500); }
 }
 
+let currentGroup='demo';  // 'demo' or 'locomo'
+
 async function doSearch(){
   const q=document.getElementById('search-query').value.trim(); if(!q) return;
   const box=document.getElementById('search-results');
   box.innerHTML='<span class="spinner"></span> 检索中...';
-  const r=await post('/api/search',{query:q});
+  const r=await post('/api/search',{query:q, group_id:currentGroup});
   renderResults(box, r, false);
 }
 
@@ -194,8 +221,60 @@ async function doTemporal(){
   if(!q) return;
   const box=document.getElementById('tq-results');
   box.innerHTML='<span class="spinner"></span> 查询中...';
-  const r=await post('/api/temporal',{query:q,datetime:dt+'T00:00:00'});
+  const r=await post('/api/temporal',{query:q,datetime:dt+'T00:00:00', group_id:currentGroup});
   renderResults(box, r, true);
+}
+
+// --- LOCOMO benchmark integration ---
+async function loadLocomoSessions(){
+  const sessions=await fetch('/api/locomo/sessions').then(x=>x.json());
+  const sel=document.getElementById('locomo-idx');
+  sel.innerHTML='<option value="">— 选择 LOCOMO session —</option>';
+  sessions.forEach(s=>{
+    const o=document.createElement('option');
+    o.value=s.idx;
+    o.textContent=`#${s.idx} ${s.sample_id} | ${s.speaker_a} & ${s.speaker_b} | ${s.n_qa}QA/${s.n_sessions}轮`;
+    sel.appendChild(o);
+  });
+}
+
+async function loadLocomo(){
+  const idx=document.getElementById('locomo-idx').value;
+  if(idx===''){ alert('请先选择 LOCOMO session'); return; }
+  const n=document.getElementById('locomo-n').value;
+  const btn=document.getElementById('btn-locomo'); btn.disabled=true;
+  const old=btn.textContent; btn.innerHTML='<span class="spinner"></span> 摄入中...';
+  const box=document.getElementById('locomo-result');
+  box.innerHTML='<span class="spinner"></span> DeepSeek 提取实体/边 + 写入 HugeGraph（每轮~5s）...';
+  currentGroup='locomo';
+  try{
+    const r=await post('/api/locomo/load',{idx:parseInt(idx), n_sessions:parseInt(n)});
+    if (r.error){ box.innerHTML=`<span style="color:var(--red);">✗ ${r.error}</span>`; return; }
+    let totE=0, totEd=0;
+    r.episodes.forEach(e=>{ totE+=e.entities; totEd+=e.edges; });
+    box.innerHTML=`<span style="color:var(--green);">✓ ${r.sample_id}: 摄入 ${r.loaded} 轮对话 → ${totE} 实体 / ${totEd} 边（已存入 HugeGraph）</span>`;
+    refreshGraph(); refreshStats();
+  }catch(e){ box.textContent='错误: '+e; }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
+
+async function loadLocomoQA(){
+  const idx=document.getElementById('locomo-idx').value;
+  const box=document.getElementById('locomo-qa');
+  if(idx===''){ box.innerHTML=''; return; }
+  const r=await fetch(`/api/locomo/qa?idx=${idx}`).then(x=>x.json());
+  box.innerHTML=(r.qa||[]).slice(0,12).map((qa,i)=>
+    `<div class="result-item" style="cursor:pointer;margin-bottom:4px;" onclick="askLocomoQA(${i})">
+      <div class="fact" style="font-size:11px;">Q${i+1} [${qa.category}] ${qa.q.slice(0,55)}</div>
+      <div class="meta">A: ${qa.a.slice(0,50)}</div>
+    </div>`).join('');
+  window._locomoQA=r.qa||[];
+}
+
+function askLocomoQA(i){
+  const qa=window._locomoQA[i]; if(!qa) return;
+  document.getElementById('search-query').value=qa.q;
+  doSearch();
 }
 
 function renderResults(box, r, temporal){
@@ -267,7 +346,7 @@ async function resetGraph(){
   document.getElementById('tq-results').innerHTML='';
 }
 
-initCyto(); refreshStats();
+initCyto(); refreshStats(); loadLocomoSessions();
 </script>
 </body>
 </html>

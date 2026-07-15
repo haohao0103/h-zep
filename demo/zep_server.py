@@ -70,7 +70,8 @@ def search():
     q = d.get("query", "").strip()
     if not q:
         return jsonify({"error": "empty query"}), 400
-    return jsonify(engine.search(q, group_id="demo", num_results=8))
+    gid = d.get("group_id", "demo")
+    return jsonify(engine.search(q, group_id=gid, num_results=8))
 
 
 @app.route("/api/temporal", methods=["POST"])
@@ -81,7 +82,8 @@ def temporal():
     if not q or not pit_str:
         return jsonify({"error": "need query + datetime"}), 400
     pit = datetime.fromisoformat(pit_str).replace(tzinfo=timezone.utc)
-    return jsonify(engine.temporal_query(q, pit, group_id="demo", num_results=8))
+    gid = d.get("group_id", "demo")
+    return jsonify(engine.temporal_query(q, pit, group_id=gid, num_results=8))
 
 
 @app.route("/api/graph")
@@ -123,6 +125,107 @@ def stats():
     return jsonify({"entities": hg.count("Entity"),
                     "episodes": hg.count("Episodic"),
                     "cached_edges": len(engine._edges)})
+
+
+# --- LOCOMO benchmark dataset (real agent-memory eval data) ---
+import json as _json
+from datetime import datetime as _dt
+
+_LOCOMO_PATH = os.path.join(os.path.dirname(__file__), "..",
+    "incubator-hugegraph-ai", "hugegraph-llm", "tests", "locomo_data", "locomo10.json")
+try:
+    with open(_LOCOMO_PATH) as _f:
+        LOCOMO = _json.load(_f)
+    log.info("LOCOMO loaded: %d sessions", len(LOCOMO))
+except Exception as _e:
+    LOCOMO = []
+    log.warning("LOCOMO not loaded: %s", _e)
+
+
+def _parse_locomo_dt(s: str) -> _dt:
+    """Parse '1:56 pm on 8 May, 2023' → datetime."""
+    for fmt in ("%I:%M %p on %d %B, %Y", "%I:%M %p on %d %b, %Y"):
+        try:
+            return _dt.strptime(s, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return _dt.now(timezone.utc)
+
+
+@app.route("/api/locomo/sessions")
+def locomo_sessions():
+    """List 10 LOCOMO sessions (real Zep eval data)."""
+    out = []
+    for i, s in enumerate(LOCOMO):
+        c = s.get("conversation", {})
+        n_sub = sum(1 for k in c if k.startswith("session_") and not k.endswith("_date_time"))
+        ss = s.get("session_summary", {})
+        summary = ss.get("session_1_summary", "") if isinstance(ss, dict) else str(ss)
+        out.append({
+            "idx": i, "sample_id": s.get("sample_id", f"conv-{i}"),
+            "speaker_a": c.get("speaker_a", "?"), "speaker_b": c.get("speaker_b", "?"),
+            "n_qa": len(s.get("qa", [])), "n_sessions": n_sub,
+            "summary": (summary or "")[:120],
+        })
+    return jsonify(out)
+
+
+@app.route("/api/locomo/load", methods=["POST"])
+def locomo_load():
+    """Load first N sub-sessions of a LOCOMO session as episodes into HugeGraph."""
+    d = request.json or {}
+    idx = int(d.get("idx", 0))
+    n = int(d.get("n_sessions", 3))
+    if idx >= len(LOCOMO):
+        return jsonify({"error": "bad idx"}), 400
+    s = LOCOMO[idx]
+    c = s["conversation"]
+    results = []
+    loaded = 0
+    try:
+        for k in sorted([k for k in c if k.startswith("session_") and not k.endswith("_date_time")],
+                        key=lambda x: int(x.split("_")[1])):
+            if loaded >= n:
+                break
+            dt_key = k + "_date_time"
+            dt_str = c.get(dt_key, "")
+            ref = _parse_locomo_dt(dt_str)
+            turns = c[k]
+            body = " ".join(f"{t.get('speaker','?')}: {t.get('text','')}"
+                            for t in turns if t.get("text"))
+            if not body.strip():
+                continue
+            r = engine.add_episode(
+                name=f"locomo_{s['sample_id']}_{k}",
+                body=body[:2000],
+                source_description=f"LOCOMO {s['sample_id']} {k} ({dt_str})",
+                reference_time=ref,
+                group_id="locomo",
+                source="message",
+            )
+            results.append({"session": k, "date": dt_str, "turns": len(turns),
+                            "entities": r.get("entities", 0), "edges": r.get("edges", 0)})
+            loaded += 1
+        return jsonify({"sample_id": s["sample_id"], "loaded": loaded, "episodes": results})
+    except Exception as ex:
+        log.exception("locomo_load failed")
+        raw = str(ex)
+        if "402" in raw or "Insufficient Balance" in raw or "insufficient_quota" in raw:
+            return jsonify({"error": "LLM 余额不足（DeepSeek 402 Insufficient Balance），请充值 DeepSeek 账户后再试。",
+                            "raw": raw, "loaded": loaded, "episodes": results}), 503
+        return jsonify({"error": f"摄入失败: {raw}", "loaded": loaded, "episodes": results}), 500
+
+
+@app.route("/api/locomo/qa")
+def locomo_qa():
+    """Return QA list for a LOCOMO session (for retrieval eval)."""
+    idx = int(request.args.get("idx", 0))
+    if idx >= len(LOCOMO):
+        return jsonify({"error": "bad idx"}), 400
+    s = LOCOMO[idx]
+    return jsonify({"sample_id": s["sample_id"],
+                   "qa": [{"q": x.get("question", ""), "a": x.get("answer", ""),
+                           "category": x.get("category", "")} for x in s.get("qa", [])]})
 
 
 if __name__ == "__main__":
