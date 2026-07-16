@@ -107,9 +107,15 @@
 
     <div class="card" style="border-color:var(--accent);">
       <h2>📚 LOCOMO 基准数据集 <span class="badge">业界 agent-memory 评测</span></h2>
-      <div class="stats" style="margin-bottom:6px;">Zep 官方长对话记忆评测集 · 10 sessions · 真实人物跨月对话 + 199 QA/session</div>
+      <div class="row" style="margin-bottom:6px;">
+        <select id="locomo-ds" style="flex:0 0 130px;padding:4px;border:1px solid var(--border);border-radius:6px;font-size:12px;" onchange="loadLocomoSessions()">
+          <option value="en">英文 LOCOMO</option>
+          <option value="zh" selected>中文数据集</option>
+        </select>
+        <span class="stats" id="locomo-ds-desc">中文 agent-memory 演示 · 含时序变更</span>
+      </div>
       <select id="locomo-idx" style="width:100%;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:12px;" onchange="loadLocomoQA()">
-        <option value="">— 选择 LOCOMO session —</option>
+        <option value="">— 选择 session —</option>
       </select>
       <div class="row" style="margin-top:6px;">
         <select id="locomo-n" style="flex:0 0 90px;">
@@ -226,10 +232,13 @@ async function doTemporal(){
 }
 
 // --- LOCOMO benchmark integration ---
+function locomoDs(){ return document.getElementById('locomo-ds').value; }
+
 async function loadLocomoSessions(){
-  const sessions=await fetch('/api/locomo/sessions').then(x=>x.json());
+  const ds=locomoDs();
+  const sessions=await fetch(`/api/locomo/sessions?datasource=${ds}`).then(x=>x.json());
   const sel=document.getElementById('locomo-idx');
-  sel.innerHTML='<option value="">— 选择 LOCOMO session —</option>';
+  sel.innerHTML='<option value="">— 选择 session —</option>';
   sessions.forEach(s=>{
     const o=document.createElement('option');
     o.value=s.idx;
@@ -240,15 +249,16 @@ async function loadLocomoSessions(){
 
 async function loadLocomo(){
   const idx=document.getElementById('locomo-idx').value;
-  if(idx===''){ alert('请先选择 LOCOMO session'); return; }
+  if(idx===''){ alert('请先选择 session'); return; }
   const n=document.getElementById('locomo-n').value;
+  const ds=locomoDs();
   const btn=document.getElementById('btn-locomo'); btn.disabled=true;
   const old=btn.textContent; btn.innerHTML='<span class="spinner"></span> 摄入中...';
   const box=document.getElementById('locomo-result');
   box.innerHTML='<span class="spinner"></span> DeepSeek 提取实体/边 + 写入 HugeGraph（每轮~5s）...';
   currentGroup='locomo';
   try{
-    const r=await post('/api/locomo/load',{idx:parseInt(idx), n_sessions:parseInt(n)});
+    const r=await post('/api/locomo/load',{idx:parseInt(idx), n_sessions:parseInt(n), datasource:ds});
     if (r.error){ box.innerHTML=`<span style="color:var(--red);">✗ ${r.error}</span>`; return; }
     let totE=0, totEd=0;
     r.episodes.forEach(e=>{ totE+=e.entities; totEd+=e.edges; });
@@ -262,7 +272,8 @@ async function loadLocomoQA(){
   const idx=document.getElementById('locomo-idx').value;
   const box=document.getElementById('locomo-qa');
   if(idx===''){ box.innerHTML=''; return; }
-  const r=await fetch(`/api/locomo/qa?idx=${idx}`).then(x=>x.json());
+  const ds=locomoDs();
+  const r=await fetch(`/api/locomo/qa?idx=${idx}&datasource=${ds}`).then(x=>x.json());
   box.innerHTML=(r.qa||[]).slice(0,12).map((qa,i)=>
     `<div class="result-item" style="cursor:pointer;margin-bottom:4px;" onclick="askLocomoQA(${i})">
       <div class="fact" style="font-size:11px;">Q${i+1} [${qa.category}] ${qa.q.slice(0,55)}</div>

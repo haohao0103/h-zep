@@ -1,0 +1,96 @@
+[
+  {
+    "sample_id": "zh-lilei",
+    "conversation": {
+      "speaker_a": "李雷", "speaker_b": "韩梅梅",
+      "session_1_date_time": "2024-03-15",
+      "session_1": [
+        {"speaker": "韩梅梅", "text": "李雷！好久不见，你现在在哪工作呀？"},
+        {"speaker": "李雷", "text": "我刚入职腾讯，在深圳做后端开发，主要用Java写微服务。"},
+        {"speaker": "韩梅梅", "text": "腾讯啊，大厂！待遇怎么样？"},
+        {"speaker": "李雷", "text": "还行，年薪四十万左右，团队用Spring Cloud技术栈。我负责支付模块。"},
+        {"speaker": "韩梅梅", "text": "住得离公司远吗？"},
+        {"speaker": "李雷", "text": "现在住宝安区，通勤要一个多小时，有点累。"}
+      ],
+      "session_2_date_time": "2024-09-20",
+      "session_2": [
+        {"speaker": "韩梅梅", "text": "李雷，最近怎么样？还在腾讯吗？"},
+        {"speaker": "李雷", "text": "还在腾讯。不过我上个月搬家到南山区了，离公司近多了，骑车十分钟。"},
+        {"speaker": "韩梅梅", "text": "那方便多了！业余时间干嘛呢？"},
+        {"speaker": "李雷", "text": "我最近开始学吉他了，报了南山的一个吉他班，每周三晚上上课。老师叫老周，教得不错。"},
+        {"speaker": "韩梅梅", "text": "吉他！挺有格调的。工作上有变动吗？"},
+        {"speaker": "李雷", "text": "工作还是做支付模块，不过开始接触一些算法相关的东西，觉得挺有意思。"}
+      ],
+      "session_3_date_time": "2025-03-10",
+      "session_3": [
+        {"speaker": "韩梅梅", "text": "李雷！听说你有大变动？"},
+        {"speaker": "李雷", "text": "对！我上个月从腾讯离职了，跳槽到字节跳动做算法工程师。"},
+        {"speaker": "韩梅梅", "text": "字节！那编程语言换了吗？"},
+        {"speaker": "李雷", "text": "换了，现在主要用Python做推荐算法，Java基本不写了。团队用PyTorch训练模型。"},
+        {"speaker": "韩梅梅", "text": "吉他还在学吗？"},
+        {"speaker": "李雷", "text": "还在学，已经能弹几首完整的曲子了。老周说我进步挺快。"},
+        {"speaker": "韩梅梅", "text": "住的地方没变吧？"},
+        {"speaker": "李雷", "text": "没变，还在南山。不过字节办公区在南山科技园，通勤也很近。"}
+      ]
+    },
+    "session_summary": {"session_1_summary": "李雷2024年3月在腾讯做后端开发，用Java，住宝安。", "session_2_summary": "李雷2024年9月搬家到南山，开始学吉他。", "session_3_summary": "李雷2025年3月跳槽字节做算法，改用Python。"},
+    "qa": [
+      {"question": "李雷现在在哪家公司工作", "answer": "字节跳动", "category": "single-hop"},
+      {"question": "李雷2024年在哪家公司工作", "answer": "腾讯", "category": "temporal"},
+      {"question": "李雷现在用什么编程语言", "answer": "Python", "category": "single-hop"},
+      {"question": "李雷在腾讯时用什么编程语言", "answer": "Java", "category": "temporal"},
+      {"question": "李雷现在住在哪里", "answer": "深圳南山", "category": "single-hop"},
+      {"question": "李雷学什么乐器", "answer": "吉他", "category": "single-hop"},
+      {"question": "李雷的吉他老师叫什么", "answer": "老周", "category": "single-hop"},
+      {"question": "李雷在字节负责什么方向", "answer": "推荐算法", "category": "single-hop"},
+      {"question": "李雷2024年9月住在哪里", "answer": "深圳南山", "category": "temporal"},
+      {"question": "李雷在腾讯负责什么模块", "answer": "支付模块", "category": "single-hop"}
+    ]
+  },
+  {
+    "sample_id": "zh-wangfang",
+    "conversation": {
+      "speaker_a": "张伟", "speaker_b": "王芳",
+      "session_1_date_time": "2024-05-01",
+      "session_1": [
+        {"speaker": "张伟", "text": "王芳，最近在忙什么呢？"},
+        {"speaker": "王芳", "text": "我在准备考研呢，目标是北京大学计算机专业，每天复习十个小时。"},
+        {"speaker": "张伟", "text": "北大？难度不小啊。"},
+        {"speaker": "王芳", "text": "是的，但我本科成绩不错，想冲一把。专业课主要复习数据结构和操作系统。"},
+        {"speaker": "张伟", "text": "考研什么时候？"},
+        {"speaker": "王芳", "text": "12月底。考完我就放松放松，想去云南旅游。"}
+      ],
+      "session_2_date_time": "2024-12-20",
+      "session_2": [
+        {"speaker": "张伟", "text": "王芳，考研成绩出来了吧？"},
+        {"speaker": "王芳", "text": "唉，没考上北大，差了十分。我决定不二战了，直接找工作。"},
+        {"speaker": "张伟", "text": "找到工作了吗？"},
+        {"speaker": "王芳", "text": "找到了，入职阿里巴巴做产品经理，在杭州。下周一报到。"},
+        {"speaker": "张伟", "text": "阿里产品经理，不错的岗位！"},
+        {"speaker": "王芳", "text": "嗯，年薪三十五万。云南旅游也去了，大理很美。"}
+      ],
+      "session_3_date_time": "2025-06-15",
+      "session_3": [
+        {"speaker": "张伟", "text": "王芳！听说你从阿里离职了？"},
+        {"speaker": "王芳", "text": "对，上个月离职了。我决定创业，开了一家咖啡店。"},
+        {"speaker": "张伟", "text": "咖啡店？在哪儿？"},
+        {"speaker": "王芳", "text": "在杭州西湖区，店名叫'午后阳光'。我自己学做手冲咖啡，还请了一个咖啡师小林。"},
+        {"speaker": "张伟", "text": "产品经理转咖啡店老板，跨度好大。"},
+        {"speaker": "王芳", "text": "想做自己喜欢的事嘛。目前每天营业额两千左右，还在起步阶段。"}
+      ]
+    },
+    "session_summary": {"session_1_summary": "王芳2024年5月准备考北大研究生。", "session_2_summary": "王芳2024年12月考研失败，入职阿里做产品。", "session_3_summary": "王芳2025年6月从阿里离职，开咖啡店创业。"},
+    "qa": [
+      {"question": "王芳现在做什么工作", "answer": "开咖啡店", "category": "single-hop"},
+      {"question": "王芳2024年底在哪工作", "answer": "阿里巴巴", "category": "temporal"},
+      {"question": "王芳的咖啡店叫什么名字", "answer": "午后阳光", "category": "single-hop"},
+      {"question": "王芳咖啡店在哪里", "answer": "杭州西湖区", "category": "single-hop"},
+      {"question": "王芳考研目标学校", "answer": "北京大学", "category": "single-hop"},
+      {"question": "王芳在阿里做什么岗位", "answer": "产品经理", "category": "temporal"},
+      {"question": "王芳的咖啡师叫什么", "answer": "小林", "category": "single-hop"},
+      {"question": "王芳咖啡店日营业额多少", "answer": "两千左右", "category": "single-hop"},
+      {"question": "王芳2024年5月在做什么", "answer": "准备考研", "category": "temporal"},
+      {"question": "王芳考研复习什么专业课", "answer": "数据结构和操作系统", "category": "single-hop"}
+    ]
+  }
+]
