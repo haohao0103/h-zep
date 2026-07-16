@@ -88,6 +88,32 @@ for _name, _path in (("en", _LOCOMO_PATH), ("zh", _LOCOMO_ZH_PATH)):
         DATASETS[_name] = []
         log.warning("dataset[%s] not loaded: %s", _name, _e)
 
+# Graphiti built-in dataset: Wizard of Oz (chapter-segmented narrative)
+_WIZARD_PATH = os.path.join(os.path.dirname(__file__), "..",
+    "graphiti-source", "examples", "wizard_of_oz", "woo.txt")
+try:
+    import re as _re
+    with open(_WIZARD_PATH, encoding="utf-8") as _f:
+        _woo = _f.read()
+    _chapters = _re.split(r"\n\n+Chapter [IVX]+\n", _woo)[1:]
+    _wizard_conv = {"speaker_a": "Narrator", "speaker_b": "Characters"}
+    for _i, _ch in enumerate(_chapters[:10], 1):
+        _tm = _re.match(r"(.*?)\n\n", _ch)
+        _title = _tm.group(1) if _tm else f"Chapter {_i}"
+        _body = _ch[len(_title):].strip() if _tm else _ch.strip()
+        _wizard_conv[f"session_{_i}_date_time"] = f"1900-{_i:02d}-01"
+        _wizard_conv[f"session_{_i}"] = [{"speaker": "Narrator", "text": _body[:1500]}]
+    DATASETS["wizard"] = [{
+        "sample_id": "wizard-oz", "conversation": _wizard_conv,
+        "session_summary": {"session_1_summary": "Dorothy's journey from Kansas to Oz"},
+        "qa": [{"question": "Where does Dorothy live?", "answer": "Kansas", "category": "single-hop"},
+               {"question": "Who are Dorothy's companions?", "answer": "Scarecrow, Tin Woodman, Cowardly Lion", "category": "single-hop"}],
+    }]
+    log.info("dataset[wizard] loaded: Wizard of Oz, %d chapters", len(_chapters))
+except Exception as _e:
+    DATASETS["wizard"] = []
+    log.warning("dataset[wizard] not loaded: %s", _e)
+
 
 def _parse_dt(s):
     from datetime import datetime as _dt

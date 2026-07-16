@@ -9,6 +9,6 @@ See docs/ZEP_HUGEGRAPH_ADAPTER.md for the architecture & benchmark.
 
 from .driver import HugeGraphClient
 from .embedder import LocalEmbedder
-from .engine import ZepHugeGraphEngine
+from .hugegraph_driver import HugeGraphDriver
 
-__all__ = ["HugeGraphClient", "LocalEmbedder", "ZepHugeGraphEngine"]
+__all__ = ["HugeGraphClient", "LocalEmbedder", "HugeGraphDriver"]
