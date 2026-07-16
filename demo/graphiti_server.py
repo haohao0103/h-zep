@@ -141,9 +141,13 @@ def index():
 
 @app.route("/api/reset", methods=["POST"])
 def reset():
-    _run(_driver.build_indices_and_constraints(delete_existing=True))
+    # 1. wipe all data via HugeGraph /clear API (truncate backend)
+    _driver.hg.clear_graph()
+    # 2. rebuild schema (labels + properties + edge labels)
+    _driver.hg.init_schema(rebuild=False)
+    # 3. clear in-process embedding cache
     _driver.embedder._cache.clear()
-    return jsonify({"ok": True, "msg": "graph reset (Graphiti native)"})
+    return jsonify({"ok": True, "msg": "graph reset (data cleared + schema rebuilt)"})
 
 
 @app.route("/api/messages", methods=["POST"])

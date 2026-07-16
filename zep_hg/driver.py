@@ -158,15 +158,17 @@ class HugeGraphClient:
             pass
 
     def clear_graph(self) -> None:
-        """Delete all vertices & edges (for a clean PoC run)."""
-        # HugeGraph has no 'drop all' REST; iterate labels.
-        for label in list(_VERTEX_LABELS):
-            try:
-                vs = self.get_vertices_by_label(label, limit=10000)
-                for v in vs:
-                    self.delete_vertex(v["id"])
-            except HugeGraphError as e:
-                logger.warning("clear %s: %s", label, e)
+        """Delete all vertices & edges via HugeGraph truncate API."""
+        try:
+            r = self.s.delete(
+                f"{self.base}/graphs/{self.graph}/clear",
+                params={"confirm_message": "I'm sure to delete all data"})
+            if r.status_code in (200, 204):
+                logger.info("cleared graph %s via /clear (204)", self.graph)
+            else:
+                logger.warning("clear %s: %s %s", self.graph, r.status_code, r.text[:120])
+        except Exception as e:
+            logger.warning("clear %s failed: %s", self.graph, e)
 
     # ----- vertex ---------------------------------------------------------- #
     def upsert_vertex(self, label: str, vid: str, props: dict) -> dict:
