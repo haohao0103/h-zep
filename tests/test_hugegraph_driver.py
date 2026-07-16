@@ -348,3 +348,153 @@ class TestDriver:
         d, hg, emb = make_driver()
         async with d.transaction() as tx:
             assert tx is not None
+
+    @pytest.mark.asyncio
+    async def test_session_execute_write(self):
+        d, hg, emb = make_driver()
+        s = d.session()
+        result = await s.execute_write(lambda tx: "ok")
+        assert result == "ok"
+
+    @pytest.mark.asyncio
+    async def test_close_no_error(self):
+        d, hg, emb = make_driver()
+        await d.close()
+        assert True
+
+    @pytest.mark.asyncio
+    async def test_delete_all_indexes(self):
+        d, hg, emb = make_driver()
+        await d.delete_all_indexes()
+        assert True
+
+
+# ----------------- additional SearchInterface coverage ----------------- #
+class TestSearchInterfaceExtra:
+    @pytest.mark.asyncio
+    async def test_edge_similarity_search(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "s1", {"uuid":"s1","name":"A","group_id":"g","summary":"","labels":'[]',"attributes":'{}',"created_time":"2024-01-01"})
+        hg.upsert_edge("RELATES_TO", "s1", "t1", "Entity", "Entity",
+                       {"uuid":"e1","fact":"works","group_id":"g","name":"rel","episodes":"[]"})
+        emb._cache["e1"] = np.array([1,0,0,0], dtype=np.float32)
+        qv = np.array([1,0,0,0], dtype=np.float32)
+        res = await d.search_interface.edge_similarity_search(d, qv, None, None, None, ["g"], 10, 0.5)
+        assert len(res) >= 1
+
+    @pytest.mark.asyncio
+    async def test_edge_similarity_src_filter(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "s1", {"uuid":"s1","name":"A","group_id":"g","summary":"","labels":'[]',"attributes":'{}',"created_time":"2024-01-01"})
+        hg.upsert_edge("RELATES_TO", "s1", "t1", "Entity", "Entity",
+                       {"uuid":"e1","fact":"works","group_id":"g","episodes":"[]"})
+        emb._cache["e1"] = np.array([1,0,0,0], dtype=np.float32)
+        qv = np.array([1,0,0,0], dtype=np.float32)
+        res = await d.search_interface.edge_similarity_search(d, qv, "s1", None, None, ["g"], 10, 0.0)
+        assert len(res) >= 1
+
+    @pytest.mark.asyncio
+    async def test_node_bfs_search(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "a", {"uuid":"a","name":"A","group_id":"g","summary":"","labels":'[]',"attributes":'{}',"created_time":"2024-01-01"})
+        hg.upsert_vertex("Entity", "b", {"uuid":"b","name":"B","group_id":"g","summary":"","labels":'[]',"attributes":'{}',"created_time":"2024-01-01"})
+        hg.upsert_edge("RELATES_TO", "a", "b", "Entity", "Entity", {"uuid":"e1"})
+        res = await d.search_interface.node_bfs_search(d, ["a"], max_depth=2, limit=10)
+        assert len(res) >= 1
+
+    @pytest.mark.asyncio
+    async def test_episode_fulltext_search(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Episodic", "ep1", {"uuid":"ep1","name":"ep","group_id":"g",
+            "content":"张明在腾讯工作","valid_at":"2024-01-01","created_time":"2024-01-01",
+            "source":"message","source_description":"","entity_edges":"[]"})
+        res = await d.search_interface.episode_fulltext_search(d, "腾讯", None, ["g"], 10)
+        assert len(res) >= 1
+
+    @pytest.mark.asyncio
+    async def test_episode_mentions_reranker(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "e1", {"uuid":"e1","name":"A","group_id":"g","summary":"","labels":'[]',"attributes":'{}',"created_time":"2024-01-01"})
+        hg.upsert_edge("MENTIONS", "ep1", "e1", "Episodic", "Entity", {"uuid":"m1"})
+        res = await d.search_interface.episode_mentions_reranker(d, ["e1"], 0)
+        assert len(res) >= 1
+
+
+# ----------------- additional GraphOperations coverage ----------------- #
+class TestGraphOperationsExtra:
+    @pytest.mark.asyncio
+    async def test_node_save_single(self):
+        d, hg, emb = make_driver()
+        n = EntityNode(uuid="u1", name="A", group_id="g", created_at=datetime(2024,1,1,tzinfo=timezone.utc))
+        await d.graph_operations_interface.node_save(n, d)
+        assert "u1" in hg.vertices
+
+    @pytest.mark.asyncio
+    async def test_episodic_node_save_single(self):
+        d, hg, emb = make_driver()
+        ep = EpisodicNode(uuid="ep1", name="ep", group_id="g", source="message",
+                          source_description="d", content="c", valid_at=datetime(2024,1,1,tzinfo=timezone.utc),
+                          created_at=datetime(2024,1,1,tzinfo=timezone.utc))
+        await d.graph_operations_interface.episodic_node_save(ep, d)
+        assert "ep1" in hg.vertices
+
+    @pytest.mark.asyncio
+    async def test_edge_save_single(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "s1", {"uuid":"s1"})
+        hg.upsert_vertex("Entity", "t1", {"uuid":"t1"})
+        e = EntityEdge(uuid="e1", group_id="g", source_node_uuid="s1", target_node_uuid="t1",
+                       name="rel", fact="f", created_at=datetime(2024,1,1,tzinfo=timezone.utc), episodes=[])
+        await d.graph_operations_interface.edge_save(e, d)
+        assert len(hg.edges) == 1
+
+    @pytest.mark.asyncio
+    async def test_episodic_get_by_uuid(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Episodic", "ep1", {"uuid":"ep1","name":"ep","group_id":"g",
+            "content":"c","valid_at":"2024-01-01","created_time":"2024-01-01",
+            "source":"message","source_description":"d","entity_edges":"[]"})
+        ep = await d.graph_operations_interface.episodic_node_get_by_uuid(None, d, "ep1")
+        assert ep is not None and ep.content == "c"
+
+    @pytest.mark.asyncio
+    async def test_episodic_get_by_uuids(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Episodic", "ep1", {"uuid":"ep1","name":"ep","group_id":"g",
+            "content":"c","valid_at":"2024-01-01","created_time":"2024-01-01",
+            "source":"message","source_description":"d","entity_edges":"[]"})
+        eps = await d.graph_operations_interface.episodic_node_get_by_uuids(None, d, ["ep1","missing"])
+        assert len(eps) == 1
+
+    @pytest.mark.asyncio
+    async def test_edge_get_by_node_uuid(self):
+        d, hg, emb = make_driver()
+        hg.upsert_edge("RELATES_TO", "s1", "t1", "Entity", "Entity", {"uuid":"e1","fact":"f"})
+        es = await d.graph_operations_interface.edge_get_by_node_uuid(None, d, "s1")
+        assert len(es) >= 1
+
+    @pytest.mark.asyncio
+    async def test_next_episode_edge_save(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Episodic", "ep1", {"uuid":"ep1"})
+        hg.upsert_vertex("Episodic", "ep2", {"uuid":"ep2"})
+        from graphiti_core.edges import EntityEdge
+        e = EntityEdge(uuid="ne1", group_id="g", source_node_uuid="ep1", target_node_uuid="ep2",
+                       name="next", fact="next", created_at=datetime(2024,1,1,tzinfo=timezone.utc), episodes=[])
+        await d.graph_operations_interface.next_episode_edge_save(e, d)
+        assert any(ed["label"] == "NEXT_EPISODE" for ed in d.hg.edges)
+
+    @pytest.mark.asyncio
+    async def test_clear_data(self):
+        d, hg, emb = make_driver()
+        hg.upsert_vertex("Entity", "u1", {"uuid":"u1"})
+        await d.graph_operations_interface.clear_data(d)
+        assert len(hg.vertices) == 0
+
+    @pytest.mark.asyncio
+    async def test_saga_methods_noop(self):
+        d, hg, emb = make_driver()
+        await d.graph_operations_interface.saga_node_save(None, d)
+        await d.graph_operations_interface.has_episode_edge_save(None, d)
+        r = await d.graph_operations_interface.saga_get_previous_episode_uuid(d, "s", "c")
+        assert r is None

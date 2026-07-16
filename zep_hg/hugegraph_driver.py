@@ -424,7 +424,8 @@ class HugeGraphSearchInterface(SearchInterface):
 
     async def episode_fulltext_search(self, driver, query, search_filter=None, group_ids=None, limit=10):
         import re
-        qtokens = set(re.findall(r"\w+", query.lower()))
+        ql = query.lower()
+        qtokens = set(re.findall(r"\w+", ql))
         out = []
         for v in self.d.hg.get_vertices_by_label("Episodic", limit=100000):
             p = v.get("properties", {})
@@ -433,6 +434,8 @@ class HugeGraphSearchInterface(SearchInterface):
             txt = (p.get("content", "") + " " + p.get("name", "")).lower()
             ttoks = set(re.findall(r"\w+", txt))
             score = len(qtokens & ttoks) / max(len(qtokens | ttoks), 1)
+            if score == 0 and ql in txt:
+                score = 0.5
             if score > 0:
                 out.append((score, self.d.graph_operations_interface._props_to_episodic(p)))
         out.sort(key=lambda x: -x[0])
@@ -483,7 +486,11 @@ class _HGSession(GraphDriverSession):
         raise NotImplementedError("HugeGraph has no Cypher; use graph_operations_interface")
 
     async def execute_write(self, func, *args, **kwargs):
-        return await func(self, *args, **kwargs)
+        import inspect
+        result = func(self, *args, **kwargs)
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     async def close(self):
         pass
