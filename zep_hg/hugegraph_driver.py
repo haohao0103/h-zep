@@ -16,7 +16,7 @@ from __future__ import annotations
 import json
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 
 from graphiti_core.driver.driver import GraphDriver, GraphDriverSession, GraphProvider
@@ -248,7 +248,7 @@ class HugeGraphGraphOperations(GraphOperationsInterface):
                           group_id=p.get("group_id", ""), summary=_s2j(p.get("summary")) or "",
                           labels=_s2j(p.get("labels")) or ["Entity"],
                           attributes=_s2j(p.get("attributes")) or {},
-                          created_at=_s2dt(p.get("created_time")))
+                          created_at=_s2dt(p.get("created_time")) or datetime.now(timezone.utc))
 
     def _props_to_episodic(self, p):
         p = p.get("properties", p)
@@ -258,7 +258,7 @@ class HugeGraphGraphOperations(GraphOperationsInterface):
                             source_description=p.get("source_description", ""),
                             content=p.get("content", ""),
                             valid_at=_s2dt(p.get("valid_at")),
-                            created_at=_s2dt(p.get("created_time")),
+                            created_at=_s2dt(p.get("created_time")) or datetime.now(timezone.utc),
                             entity_edges=_s2j(p.get("entity_edges")) or [])
 
     def _edge_to_object(self, e):
@@ -270,7 +270,7 @@ class HugeGraphGraphOperations(GraphOperationsInterface):
                           expired_at=_s2dt(p.get("expired_at")),
                           reference_time=_s2dt(p.get("reference_time")),
                           episodes=_s2j(p.get("episodes")) or [],
-                          created_at=_s2dt(p.get("created_time")),
+                          created_at=_s2dt(p.get("created_time")) or datetime.now(timezone.utc),
                           attributes=_s2j(p.get("attributes")) or {})
 
 
@@ -305,7 +305,8 @@ class HugeGraphSearchInterface(SearchInterface):
 
     async def node_fulltext_search(self, driver, query, search_filter=None, group_ids=None, limit=10):
         import re
-        qtokens = set(re.findall(r"\w+", query.lower()))
+        ql = query.lower()
+        qtokens = set(re.findall(r"\w+", ql))
         out = []
         for v in self.d.hg.get_vertices_by_label("Entity", limit=100000):
             p = v.get("properties", {})
@@ -314,6 +315,8 @@ class HugeGraphSearchInterface(SearchInterface):
             txt = (p.get("name", "") + " " + (p.get("summary") or "")).lower()
             ttoks = set(re.findall(r"\w+", txt))
             score = len(qtokens & ttoks) / max(len(qtokens | ttoks), 1)
+            if score == 0 and ql in txt:
+                score = 0.5  # substring fallback for CJK
             if score > 0:
                 out.append((score, self.d.graph_operations_interface._props_to_entity(p)))
         out.sort(key=lambda x: -x[0])
@@ -321,7 +324,8 @@ class HugeGraphSearchInterface(SearchInterface):
 
     async def edge_fulltext_search(self, driver, query, search_filter=None, group_ids=None, limit=10):
         import re
-        qtokens = set(re.findall(r"\w+", query.lower()))
+        ql = query.lower()
+        qtokens = set(re.findall(r"\w+", ql))
         out = []
         for v in self.d.hg.get_vertices_by_label("Entity", limit=100000):
             es = self.d.hg.get_edges_of(v.get("id"), direction="OUT")
@@ -334,6 +338,8 @@ class HugeGraphSearchInterface(SearchInterface):
                 txt = (p.get("fact", "") + " " + p.get("name", "")).lower()
                 ttoks = set(re.findall(r"\w+", txt))
                 score = len(qtokens & ttoks) / max(len(qtokens | ttoks), 1)
+                if score == 0 and ql in txt:
+                    score = 0.5  # substring fallback for CJK
                 if score > 0:
                     out.append((score, self.d.graph_operations_interface._edge_to_object(e)))
         # dedupe by uuid
@@ -500,8 +506,9 @@ class HugeGraphDriver(GraphDriver):
     provider = GraphProvider.NEO4J  # reuse to satisfy get_default_group_id; override _database
 
     def __init__(self, url="http://127.0.0.1:8080", graph="hugegraph",
-                 user="admin", pwd="admin", embedder: LocalEmbedder | None = None):
-        self.hg = HugeGraphClient(url, graph, user, pwd)
+                 user="admin", pwd="admin", embedder: LocalEmbedder | None = None,
+                 hg_client: HugeGraphClient | None = None):
+        self.hg = hg_client or HugeGraphClient(url, graph, user, pwd)
         self.embedder = embedder or LocalEmbedder()
         self._database = graph
         self.default_group_id = graph
